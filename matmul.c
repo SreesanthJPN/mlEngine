@@ -10,6 +10,14 @@ struct matrix{
     float** matData;
 };
 
+float getValueAtidx(float* row, float* col){
+    if(sizeof(row) != sizeof(col)){
+        perror("Dimention mismatch");
+        exit(EXIT_FAILURE);
+    }
+    
+}
+
 struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
     
     if(m1->cols != m2->rows){
@@ -24,9 +32,11 @@ struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
 
     result->rows = m1->rows;
     result->cols = m2->cols;
-    result->matData = createMatrix(&result, result->rows, result->cols);
+    result->matData = createMatrix(result, result->rows, result->cols);
 
-    int reqThreads = result->rows * result->cols;
+    int noOfoperations = result->rows * result->cols;
+
+
 }
 
 void freeArray(struct matrix* mat){
@@ -35,11 +45,12 @@ void freeArray(struct matrix* mat){
         free(data[i]);
     }
     free(data);
+    free(mat);
 }
 
 float** createMatrix(struct matrix* mat, int rows, int cols){
 
-    float** twoDarray = (float**)malloc(rows * sizeof(float*));
+    float** twoDarray = (float**)malloc(rows * sizeof(float));
 
     if(twoDarray == NULL){
         perror("Failed to allocate memory for the matrix");
