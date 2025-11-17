@@ -4,6 +4,9 @@
 #include<pthread.h>
 #include<unistd.h>
 
+
+
+
 long maxThreads(long percent){
     return sysconf(_SC_NPROCESSORS_ONLN) * (percent/100);
 }
