@@ -2,13 +2,36 @@
 #include<stdlib.h>
 #include<time.h>
 #include<pthread.h>
+#include<unistd.h>
 
-float randf(){ return (float)rand()/(float)RAND_MAX; }
+long maxThreads(long percent){
+    return sysconf(_SC_NPROCESSORS_ONLN) * (percent/100);
+}
+
+float randf(){ return 0.01*((float)rand()/(float)RAND_MAX); }
 
 struct matrix{
     int rows, cols;
     float** matData;
 };
+
+struct matrix* transposeMat(struct matrix* mat){
+
+    struct matrix *transMat;
+    transMat = (struct matrix *)malloc(sizeof(struct matrix));
+
+    transMat->rows = mat->cols;
+    transMat->cols = mat->rows;
+
+    transMat->matData = createMatrix(transMat);
+
+    for(int i = 0; i < mat->rows; i++){
+        for(int j = 0; j < mat->cols; j++){
+            transMat->matData[i][j] = mat->matData[j][i];
+        }
+    }
+    return transMat;
+}
 
 float getValueAtidx(float* row, float* col){
     if(sizeof(row) != sizeof(col)){
@@ -17,7 +40,7 @@ float getValueAtidx(float* row, float* col){
     }
     
 }
-
+/*
 struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
     
     if(m1->cols != m2->rows){
@@ -32,12 +55,12 @@ struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
 
     result->rows = m1->rows;
     result->cols = m2->cols;
-    result->matData = createMatrix(result, result->rows, result->cols);
+    result->matData = createMatrix(result);
 
     int noOfoperations = result->rows * result->cols;
 
 
-}
+}*/
 
 void freeArray(struct matrix* mat){
     float** data = mat->matData;
@@ -48,9 +71,12 @@ void freeArray(struct matrix* mat){
     free(mat);
 }
 
-float** createMatrix(struct matrix* mat, int rows, int cols){
+float** createMatrix(struct matrix* mat){
 
-    float** twoDarray = (float**)malloc(rows * sizeof(float));
+    int rows = mat->rows;
+    int cols = mat->cols;
+
+    float** twoDarray = (float**)malloc(rows * sizeof(float*));
 
     if(twoDarray == NULL){
         perror("Failed to allocate memory for the matrix");
@@ -75,4 +101,9 @@ float** createMatrix(struct matrix* mat, int rows, int cols){
         }
     }
     return twoDarray;
+}
+
+int main(){
+    long ma = maxThreads(0.5);
+    printf("%ld", ma);
 }
