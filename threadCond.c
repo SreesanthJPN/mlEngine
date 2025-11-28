@@ -14,7 +14,7 @@ void* task(float* row1, float** mat2, int size){
     return (void*)result;
 }
 
-typedef float (*task)(float*, float*);
+typedef void* (*task)(float*, float*);
 
 typedef struct{
     task* Queue;
