@@ -84,7 +84,7 @@ void freeArray(struct matrix* mat){
 }
 
 
-/*
+
 struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
     
     if(m1->cols != m2->rows){
@@ -101,10 +101,10 @@ struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
     result->cols = m2->cols;
     result->matData = createMatrix(result);
 
-    int noOfoperations = result->rows * result->cols;
+    struct matrix *inverseMat = transposeMat(matrix2);
 
-
-}*/
+    
+}
 
 int main(){
     long ma = maxThreads(0.5);
