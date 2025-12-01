@@ -102,8 +102,6 @@ struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
     result->matData = createMatrix(result);
 
     struct matrix *inverseMat = transposeMat(matrix2);
-
-    
 }
 
 int main(){

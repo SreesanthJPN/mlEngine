@@ -5,7 +5,7 @@
 #include<memory.h>
 
 void* task(float* row1, int cols, float** mat2, int rows){
-    float *result = (float*)malloc(sizeof(mat2)/sizeof(mat2[0]) * sizeof(float));
+    float *result = (float*)malloc(rows * sizeof(float));
     for(int i = 0; i < rows; i++){
         float temp = (float)0;
         for(int j = 0; j < cols; j++){
@@ -51,22 +51,83 @@ taskQueue* createTaskQueue(float** mat1, int m1Rows, int cols, float** mat2, int
     tempQueue->mat2 = mat2;
     tempQueue->mat1Rows = m1Rows;
     tempQueue->mat2Rows = m2Rows;
-    tempQueue->taskCount = m2Rows;
+    tempQueue->taskCount = m1Rows;
 
     tempQueue->tQueue = (funcArgs*)malloc(tempQueue->taskCount * sizeof(funcArgs));
 
-    int c = 0;
     for(int i = 0; i < m1Rows; i++){
             funcArgs a = createArgs(mat1[i], m2Rows, mat2, cols, i);  
-            tempQueue->tQueue[c] = a;   
-            c++;  
+            tempQueue->tQueue[i] = a;   
     }
     return tempQueue;
 }
 
 typedef struct threadPool{
-    long nThreads;
-    pthread_t *tPool;
+    long nworkerThreads;
+    pthread_t *tPool; // Allocate size based on the no of workerThreads
     taskQueue* tasks;
+    pthread_mutex_t taskLock;
+    pthread_cond_t taskCond;
     int nextTask;
+    int taskReady;
+    int shutdown;
+    float** resultMat;
 }threadPool;
+
+void* worker(void* arg){
+    threadPool* tpool = (threadPool*)arg;
+
+    while (1) {
+
+        pthread_mutex_lock(&tpool->taskLock);
+
+        while (tpool->taskReady == 0 && tpool->shutdown == 0) {
+            pthread_cond_wait(&tpool->taskCond, &tpool->taskLock);
+        }
+
+        if (tpool->shutdown == 1) {
+            pthread_mutex_unlock(&tpool->taskLock);
+            pthread_exit(NULL);
+        }
+
+        if (tpool->nextTask >= tpool->tasks->taskCount) {
+            tpool->taskReady = 0;
+            pthread_mutex_unlock(&tpool->taskLock);
+            continue;
+        }
+
+        int myTaskIndex = tpool->nextTask;
+        tpool->nextTask++;
+
+        pthread_mutex_unlock(&tpool->taskLock);
+
+        funcArgs args = tpool->tasks->tQueue[myTaskIndex];
+
+        float* row = (float*) task(
+            args.row1,
+            args.cols,
+            args.mat2,
+            args.rows
+        );
+        tpool->resultMat[args.resultRow] = row;
+    }
+
+    return NULL;
+}
+
+
+void createThreadPool(threadPool* pool){
+    pool->nworkerThreads = sysconf(_SC_NPROCESSORS_ONLN);
+    pool->tPool = (pthread_t*)malloc(pool->nworkerThreads * sizeof(pthread_t));
+    pool->tasks     = NULL;
+pool->resultMat = NULL;
+pool->nextTask  = 0;
+pool->taskReady = 0;
+pool->shutdown  = 0;
+
+    pthread_mutex_init(&pool->taskLock, NULL);
+    pthread_cond_init(&pool->taskCond, NULL);
+    for(int i = 0; i < (int)pool->nworkerThreads; i++){
+        pthread_create(&pool->tPool[i], NULL, worker, pool);
+    }
+}
