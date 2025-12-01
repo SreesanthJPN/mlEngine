@@ -3,15 +3,19 @@
 #include<time.h>
 #include<pthread.h>
 #include<unistd.h>
+#include<time.h>
+
+#include "threadPool.h"
 
 float randf(){ return 0.01*((float)rand()/(float)RAND_MAX); }
 
-struct matrix{
+
+typedef struct matrix{
     int rows, cols;
     float** matData;
-};
+}matrix;
 
-float** createMatrix(struct matrix* mat){
+float** createMatrix(matrix* mat){
 
     int rows = mat->rows;
     int cols = mat->cols;
@@ -47,10 +51,10 @@ long maxThreads(long percent){
     return sysconf(_SC_NPROCESSORS_ONLN) * (percent/100);
 }
 
-struct matrix* transposeMat(struct matrix* mat){
+matrix* transposeMat(matrix* mat){
 
-    struct matrix *transMat;
-    transMat = (struct matrix *)malloc(sizeof(struct matrix));
+    matrix *transMat;
+    transMat = (matrix *)malloc(sizeof(matrix));
 
     transMat->rows = mat->cols;
     transMat->cols = mat->rows;
@@ -74,7 +78,7 @@ float getValueAtidx(float* row, float* col){
 }
 
 
-void freeArray(struct matrix* mat){
+void freeArray(matrix* mat){
     float** data = mat->matData;
     for(int i = 0;i < mat->rows; i++){
         free(data[i]);
@@ -85,26 +89,39 @@ void freeArray(struct matrix* mat){
 
 
 
-struct matrix* mathMul(struct matrix* m1, struct matrix* m2){
-    
-    if(m1->cols != m2->rows){
-        perror("Invalid dimentions for matrix multiplication");
+matrix* mathMul(matrix* m1, matrix* m2, threadPool* pool){
+
+    if (m1->cols != m2->rows) {
+        perror("Invalid dimensions for matrix multiplication");
         exit(EXIT_FAILURE);
     }
-    
-    float** matrix1 = m1->matData;
-    float** matrix2 = m2->matData;
 
-    struct matrix* result = malloc(sizeof(struct matrix));
-
+    matrix* result = malloc(sizeof(matrix));
     result->rows = m1->rows;
     result->cols = m2->cols;
-    result->matData = createMatrix(result);
+    result->matData = createMatrix(result); 
 
-    struct matrix *inverseMat = transposeMat(matrix2);
-}
+    matrix* m2T = transposeMat(m2);
+    taskQueue* tQueue = createTaskQueue(m1->matData, m1->rows, m1->cols, m2T->matData, m2T->rows);
 
-int main(){
-    long ma = maxThreads(0.5);
-    printf("%ld", ma);
+    pthread_mutex_lock(&pool->taskLock);
+
+    pool->tasks = tQueue;
+    pool->resultMat = result->matData;
+    pool->nextTask = 0;
+    pool->taskReady = 1;
+
+    pthread_cond_broadcast(&pool->taskCond);
+
+    pthread_mutex_unlock(&pool->taskLock);
+
+    while (1) {
+        pthread_mutex_lock(&pool->taskLock);
+        int done = (pool->nextTask >= pool->tasks->taskCount);
+        pthread_mutex_unlock(&pool->taskLock);
+
+        if (done) break;
+        usleep(1000);
+    }
+    return result;
 }

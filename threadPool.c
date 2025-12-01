@@ -4,7 +4,7 @@
 #include<stdio.h>
 #include<memory.h>
 
-void* task(float* row1, int cols, float** mat2, int rows){
+float* task(float* row1, int cols, float** mat2, int rows){
     float *result = (float*)malloc(rows * sizeof(float));
     for(int i = 0; i < rows; i++){
         float temp = (float)0;
@@ -13,7 +13,7 @@ void* task(float* row1, int cols, float** mat2, int rows){
         }
     result[i] = temp;
     }
-    return (void*)result;
+    return result;
 }
 
 typedef struct funcArgs{
@@ -103,7 +103,7 @@ void* worker(void* arg){
 
         funcArgs args = tpool->tasks->tQueue[myTaskIndex];
 
-        float* row = (float*) task(
+        float* row = task(
             args.row1,
             args.cols,
             args.mat2,
@@ -119,11 +119,11 @@ void* worker(void* arg){
 void createThreadPool(threadPool* pool){
     pool->nworkerThreads = sysconf(_SC_NPROCESSORS_ONLN);
     pool->tPool = (pthread_t*)malloc(pool->nworkerThreads * sizeof(pthread_t));
-    pool->tasks     = NULL;
-pool->resultMat = NULL;
-pool->nextTask  = 0;
-pool->taskReady = 0;
-pool->shutdown  = 0;
+    pool->tasks = NULL;
+    pool->resultMat = NULL;
+    pool->nextTask = 0;
+    pool->taskReady = 0;
+    pool->shutdown = 0;
 
     pthread_mutex_init(&pool->taskLock, NULL);
     pthread_cond_init(&pool->taskCond, NULL);
