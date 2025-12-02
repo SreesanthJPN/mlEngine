@@ -1,8 +1,11 @@
+#define _XOPEN_SOURCE 600 
+
 #include<pthread.h>
 #include<stdlib.h>
 #include<unistd.h>
 #include<stdio.h>
 #include<memory.h>
+#include <bits/pthreadtypes.h>
 
 float* task(float* row1, int cols, float** mat2, int rows){
     float *result = (float*)malloc(rows * sizeof(float));
@@ -15,6 +18,27 @@ float* task(float* row1, int cols, float** mat2, int rows){
     }
     return result;
 }
+
+float*** tileMatrix(float **MT, int rows, int cols, int tileSize, int *tileCountOut) {
+
+    int tileCount = (cols + tileSize - 1) / tileSize;
+    *tileCountOut = tileCount;
+
+    float ***tiles = malloc(tileCount * sizeof(float**));
+
+    for (int t = 0; t < tileCount; t++) {
+        int start = t * tileSize;
+        int end   = (start + tileSize < cols) ? start + tileSize : cols;
+
+        int width = end - start;
+
+        tiles[t] = malloc(rows * sizeof(float*));
+        for (int i = 0; i < rows; i++)
+            tiles[t][i] = &MT[i][start];  // pointer view
+    }
+    return tiles;
+}
+
 
 typedef struct funcArgs{
     float* row1;
@@ -62,72 +86,86 @@ taskQueue* createTaskQueue(float** mat1, int m1Rows, int cols, float** mat2, int
     return tempQueue;
 }
 
-typedef struct threadPool{
+typedef struct threadPool {
     long nworkerThreads;
-    pthread_t *tPool; // Allocate size based on the no of workerThreads
-    taskQueue* tasks;
+    pthread_t *tPool;
+
+    // Matrix pointers
+    float **A;
+    float ***tiles;         // array of tiles of Mᵀ
+    float **resultMat;
+
+    int rowsA;
+    int colsA;
+
+    int tileSize;
+    int tileCount;
+
     pthread_mutex_t taskLock;
     pthread_cond_t taskCond;
-    int nextTask;
+    pthread_barrier_t barrier;
+
     int taskReady;
     int shutdown;
-    float** resultMat;
-}threadPool;
+} threadPool;
 
 void* worker(void* arg){
-    threadPool* tpool = (threadPool*)arg;
+    threadPool* pool = (threadPool*)arg;
 
     while (1) {
 
-        pthread_mutex_lock(&tpool->taskLock);
+        pthread_mutex_lock(&pool->taskLock);
 
-        while (tpool->taskReady == 0 && tpool->shutdown == 0) {
-            pthread_cond_wait(&tpool->taskCond, &tpool->taskLock);
-        }
+        while (!pool->taskReady && !pool->shutdown)
+            pthread_cond_wait(&pool->taskCond, &pool->taskLock);
 
-        if (tpool->shutdown == 1) {
-            pthread_mutex_unlock(&tpool->taskLock);
+        if (pool->shutdown) {
+            pthread_mutex_unlock(&pool->taskLock);
             pthread_exit(NULL);
         }
 
-        if (tpool->nextTask >= tpool->tasks->taskCount) {
-            tpool->taskReady = 0;
-            pthread_mutex_unlock(&tpool->taskLock);
-            continue;
+        pthread_mutex_unlock(&pool->taskLock);
+
+        // Tile phases
+        for (int t = 0; t < pool->tileCount; t++) {
+
+            int start = t * pool->tileSize;
+            int end   = (start + pool->tileSize < pool->colsA)
+                        ? start + pool->tileSize
+                        : pool->colsA;
+
+            for (int r = 0; r < pool->rowsA; r++) {
+
+                float sum = 0;
+                for (int k = start; k < end; k++)
+                    sum += pool->A[r][k] * pool->tiles[t][r][k - start];
+
+                pool->resultMat[r][t] = sum;
+            }
+
+            pthread_barrier_wait(&pool->barrier);
         }
 
-        int myTaskIndex = tpool->nextTask;
-        tpool->nextTask++;
-
-        pthread_mutex_unlock(&tpool->taskLock);
-
-        funcArgs args = tpool->tasks->tQueue[myTaskIndex];
-
-        float* row = task(
-            args.row1,
-            args.cols,
-            args.mat2,
-            args.rows
-        );
-        tpool->resultMat[args.resultRow] = row;
+        pthread_mutex_lock(&pool->taskLock);
+        pool->taskReady = 0;
+        pthread_mutex_unlock(&pool->taskLock);
     }
-
-    return NULL;
 }
 
 
-void createThreadPool(threadPool* pool){
+void createThreadPool(threadPool* pool, int tileSize){
     pool->nworkerThreads = sysconf(_SC_NPROCESSORS_ONLN);
-    pool->tPool = (pthread_t*)malloc(pool->nworkerThreads * sizeof(pthread_t));
-    pool->tasks = NULL;
-    pool->resultMat = NULL;
-    pool->nextTask = 0;
+    pool->tPool = malloc(pool->nworkerThreads * sizeof(pthread_t));
+
+    pool->tileSize = tileSize;
     pool->taskReady = 0;
     pool->shutdown = 0;
 
     pthread_mutex_init(&pool->taskLock, NULL);
     pthread_cond_init(&pool->taskCond, NULL);
-    for(int i = 0; i < (int)pool->nworkerThreads; i++){
+    pthread_barrier_init(&pool->barrier, NULL, pool->nworkerThreads + 1);
+
+    for(int i = 0; i < pool->nworkerThreads; i++)
         pthread_create(&pool->tPool[i], NULL, worker, pool);
-    }
 }
+
