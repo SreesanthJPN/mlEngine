@@ -119,20 +119,20 @@ matrix* mathMul(matrix* m1, matrix* m2, threadPool* pool){
 int main(){
 
     threadPool* pool = malloc(sizeof(threadPool));
-createThreadPool(pool, 64);   // e.g., tile size = 64
+createThreadPool(pool, 128);   // e.g., tile size = 64
 
     matrix *m1 = malloc(sizeof(matrix));
-    m1->rows = 3000;
-    m1->cols = 3000;
+    m1->rows = 3;
+    m1->cols = 3;
     m1->matData = createMatrix(m1);
 
     matrix *m2 = malloc(sizeof(matrix));
-    m2->rows = 3000;
-    m2->cols = 3000;
+    m2->rows = 3;
+    m2->cols = 3;
     m2->matData = createMatrix(m2);
 
     clock_t start = clock();
     matrix *m3 = mathMul(m1, m2, pool);
     clock_t end = clock();
-    printf("Time take -> %f", ((double)end - start)/CLOCKS_PER_SEC);
+    printf("Time taken -> %f", ((double)end - start)/CLOCKS_PER_SEC);
 }
