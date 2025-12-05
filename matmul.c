@@ -15,37 +15,20 @@ typedef struct matrix{
     float** matData;
 }matrix;
 
-float** createMatrix(matrix* mat){
-
+float** createMatrix(matrix* mat) {
     int rows = mat->rows;
     int cols = mat->cols;
 
-    float** twoDarray = (float**)malloc(rows * sizeof(float*));
+    float** arr = malloc(rows * sizeof(float*));
 
-    if(twoDarray == NULL){
-        perror("Failed to allocate memory for the matrix");
-        exit(EXIT_FAILURE);
+    for (int i = 0; i < rows; i++) {
+        arr[i] = malloc(cols * sizeof(float));
+        for (int j = 0; j < cols; j++)
+            arr[i][j] = 0.0f;
     }
-
-    for(int i = 0; i < rows; i++){
-
-        twoDarray[i] = malloc(cols * sizeof(float*));
-
-        if(twoDarray[i] == NULL){
-            perror("Failed to allocate memory");
-
-            for(int j = 0; j < i; j++){
-                free(twoDarray[j]);
-            }
-            free(twoDarray);
-            exit(EXIT_FAILURE);
-        }
-        for(int j = 0; j < cols; j++){
-            twoDarray[i][j] = randf();
-        }
-    }
-    return twoDarray;
+    return arr;
 }
+
 
 long maxThreads(long percent){
     return sysconf(_SC_NPROCESSORS_ONLN) * (percent/100);
@@ -63,7 +46,7 @@ matrix* transposeMat(matrix* mat){
 
     for(int i = 0; i < mat->rows; i++){
         for(int j = 0; j < mat->cols; j++){
-            transMat->matData[i][j] = mat->matData[j][i];
+            transMat->matData[j][i] = mat->matData[i][j];
         }
     }
     return transMat;
@@ -88,40 +71,72 @@ void freeArray(matrix* mat){
 }
 
 
-
-matrix* mathMul(matrix* m1, matrix* m2, threadPool* pool){
-
-    if (m1->cols != m2->rows) {
-        perror("Invalid dimensions for matrix multiplication");
-        exit(EXIT_FAILURE);
-    }
-
+matrix* mathMul(matrix* m1, matrix* m2, threadPool* pool) {
     matrix* result = malloc(sizeof(matrix));
     result->rows = m1->rows;
     result->cols = m2->cols;
-    result->matData = createMatrix(result); 
+    result->matData = createMatrix(result);
 
     matrix* m2T = transposeMat(m2);
-    taskQueue* tQueue = createTaskQueue(m1->matData, m1->rows, m1->cols, m2T->matData, m2T->rows);
+
+    pool->A = m1->matData;
+    pool->rowsA = m1->rows;
+    pool->colsA = m1->cols;
+    pool->resultMat = result->matData;
+
+    pool->tiles = tileMatrix(m2T->matData, m2T->rows, m2T->cols,
+                             pool->tileSize, &pool->tileCount);
 
     pthread_mutex_lock(&pool->taskLock);
-
-    pool->tasks = tQueue;
-    pool->resultMat = result->matData;
-    pool->nextTask = 0;
     pool->taskReady = 1;
-
     pthread_cond_broadcast(&pool->taskCond);
-
     pthread_mutex_unlock(&pool->taskLock);
 
-    while (1) {
-        pthread_mutex_lock(&pool->taskLock);
-        int done = (pool->nextTask >= pool->tasks->taskCount);
-        pthread_mutex_unlock(&pool->taskLock);
+    pthread_barrier_wait(&pool->barrier);
 
-        if (done) break;
-        usleep(1000);
-    }
     return result;
+}
+
+int main(){
+
+    threadPool* pool = malloc(sizeof(threadPool));
+createThreadPool(pool, 128);
+
+    float** m = (float**)malloc(2*sizeof(float*));
+
+    for(int i = 0; i < 2; i++){
+        float* temp = (float*)malloc(2*sizeof(float));
+        for(int j = 0; j < 2; j++){
+            temp[j] = j+1;
+        }
+        m[i] = temp;
+    }
+
+        for(int i = 0; i < 2; i++){
+        for(int j = 0; j < 2; j++){
+            printf("%f " , m[i][j]);
+        }
+        printf("\n");
+    }
+
+    matrix *m1 = malloc(sizeof(matrix));
+    m1->rows = 2;
+    m1->cols = 2;
+    m1->matData = m;
+
+    matrix *m2 = malloc(sizeof(matrix));
+    m2->rows = 2;
+    m2->cols = 2;
+    m2->matData = m;
+
+    clock_t start = clock();
+    matrix *m3 = mathMul(m1, m2, pool);
+    clock_t end = clock();
+    printf("Time taken -> %f \n", ((double)end - start)/CLOCKS_PER_SEC);
+            for(int i = 0; i < 2; i++){
+        for(int j = 0; j < 2; j++){
+            printf("%f " , m3->matData[i][j]);
+        }
+        printf("\n");
+    }
 }
