@@ -40,21 +40,3 @@ tile* getTiles(float** mat, int rows, int cols, int nRowsPerTile){
     t->tiles[(rows - finalRows)/nRowsPerTile + i] = temp;
     return t;
 }
-
-float** createMatrix(int rows, int cols) {
-    srand(time(NULL));
-    float** arr = malloc(rows * sizeof(float*));
-
-    for (int i = 0; i < rows; i++) {
-        arr[i] = malloc(cols * sizeof(float));
-        for (int j = 0; j < cols; j++)
-            arr[i][j] = 0.001*(double)rand() / RAND_MAX;
-    }
-    return arr;
-}
-
-int main() {
-    float** m1 = createMatrix(14, 3);
-    tile* t = getTiles(m1,14, 3, 3);
-    printf("%d", t->nTiles);
-}
