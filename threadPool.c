@@ -49,13 +49,22 @@ typedef struct threadPool {
     int shutdown;
 } threadPool;
 
+typedef struct {
+    threadPool* pool;
+    long tid;
+} threadArg;
+
+
 void* worker(void* arg) {
-    threadPool* pool = (threadPool*)arg;
-    long tid = (long)pthread_self() % pool->nworkerThreads;
+    threadArg* a = (threadArg*)arg;
+    threadPool* pool = a->pool;
+    long tid = a->tid;
+    free(a);
+
     int M = pool->rowsA;
     int K = pool->colsA;
-    int tileSize = pool->tileSize;
     int rowsPerThread = (M + pool->nworkerThreads - 1) / pool->nworkerThreads;
+
     int rStart = tid * rowsPerThread;
     int rEnd   = (rStart + rowsPerThread < M) ? (rStart + rowsPerThread) : M;
 
@@ -68,12 +77,16 @@ void* worker(void* arg) {
             return NULL;
         }
         pthread_mutex_unlock(&pool->taskLock);
+
+        // process all tiles
         for (int t = 0; t < pool->tileCount; t++) {
-            float** tileRows = pool->tiles[t];   
+            float** tileRows = pool->tiles[t];
             int rowsInTile = (t == pool->tileCount - 1)
-                              ? (pool->rowsA % tileSize == 0 ? tileSize : pool->rowsA % tileSize)
-                              : tileSize;
-            int colOffset = t * tileSize;
+                ? pool->rowsA - t * pool->tileSize
+                : pool->tileSize;
+
+            int colOffset = t * pool->tileSize;
+
             for (int r = rStart; r < rEnd; r++) {
                 float* rowA = pool->A[r];
                 for (int i = 0; i < rowsInTile; i++) {
@@ -84,15 +97,18 @@ void* worker(void* arg) {
                     pool->resultMat[r][colOffset + i] = sum;
                 }
             }
-        pthread_barrier_wait(&pool->barrier);
         }
+
+        pthread_barrier_wait(&pool->barrier);
+
         pthread_mutex_lock(&pool->taskLock);
         pool->taskReady = 0;
         pthread_mutex_unlock(&pool->taskLock);
     }
 }
 
-void createThreadPool(threadPool* pool, int tileSize){
+
+void createThreadPool(threadPool* pool, int tileSize) {
     pool->nworkerThreads = sysconf(_SC_NPROCESSORS_ONLN);
     pool->tPool = malloc(pool->nworkerThreads * sizeof(pthread_t));
 
@@ -104,6 +120,10 @@ void createThreadPool(threadPool* pool, int tileSize){
     pthread_cond_init(&pool->taskCond, NULL);
     pthread_barrier_init(&pool->barrier, NULL, pool->nworkerThreads + 1);
 
-    for(int i = 0; i < pool->nworkerThreads; i++)
-        pthread_create(&pool->tPool[i], NULL, worker, pool);
+    for (int i = 0; i < pool->nworkerThreads; i++) {
+        threadArg* a = malloc(sizeof(threadArg));
+        a->pool = pool;
+        a->tid = i;
+        pthread_create(&pool->tPool[i], NULL, worker, a);
+    }
 }
