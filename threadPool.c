@@ -7,151 +7,90 @@
 #include<memory.h>
 #include <bits/pthreadtypes.h>
 
-float* task(float* row1, int cols, float** mat2, int rows){
-    float *result = (float*)malloc(rows * sizeof(float));
-    for(int i = 0; i < rows; i++){
-        float temp = (float)0;
-        for(int j = 0; j < cols; j++){
-            temp += row1[j] * mat2[i][j];
-        }
-    result[i] = temp;
-    }
-    return result;
-}
-
 float*** tileMatrix(float **MT, int rows, int cols, int tileSize, int *tileCountOut) {
 
-    int tileCount = (cols + tileSize - 1) / tileSize;
+    int tileCount = (rows + tileSize - 1) / tileSize;
     *tileCountOut = tileCount;
 
     float ***tiles = malloc(tileCount * sizeof(float**));
 
     for (int t = 0; t < tileCount; t++) {
-        int start = t * tileSize;
-        int end   = (start + tileSize < cols) ? start + tileSize : cols;
 
-        int width = end - start;
+        int rowStart = t * tileSize;
+        int rowEnd = (rowStart + tileSize < rows) ? rowStart + tileSize : rows;
 
-        tiles[t] = malloc(rows * sizeof(float*));
-        for (int i = 0; i < rows; i++)
-            tiles[t][i] = &MT[i][start];  // pointer view
+        int height = rowEnd - rowStart;
+
+        // allocate array-of-rows for this tile
+        tiles[t] = malloc(height * sizeof(float*));
+
+        for (int i = 0; i < height; i++)
+            tiles[t][i] = MT[rowStart + i];   // row pointers
     }
+
     return tiles;
 }
 
 
-typedef struct funcArgs{
-    float* row1;
-    int rows;
-    float** mat2;
-    int cols;
-    int resultRow;
-}funcArgs;
-
-funcArgs createArgs(float* r1, int r, float** m2, int c, int resultRow) {
-    funcArgs a;
-    a.row1 = r1;
-    a.rows = r;
-    a.mat2 = m2;
-    a.cols = c;
-    a.resultRow = resultRow;
-    return a;
-}
-
-
-typedef struct taskQueue{
-    funcArgs* tQueue;
-    float** mat1;
-    int cols;
-    int mat1Rows;
-    float** mat2;
-    int mat2Rows;
-    int taskCount;
-}taskQueue;
-
-taskQueue* createTaskQueue(float** mat1, int m1Rows, int cols, float** mat2, int m2Rows){
-    taskQueue* tempQueue = (taskQueue*)malloc(sizeof(taskQueue));
-    tempQueue->mat1 = mat1;
-    tempQueue->mat2 = mat2;
-    tempQueue->mat1Rows = m1Rows;
-    tempQueue->mat2Rows = m2Rows;
-    tempQueue->taskCount = m1Rows;
-
-    tempQueue->tQueue = (funcArgs*)malloc(tempQueue->taskCount * sizeof(funcArgs));
-
-    for(int i = 0; i < m1Rows; i++){
-            funcArgs a = createArgs(mat1[i], m2Rows, mat2, cols, i);  
-            tempQueue->tQueue[i] = a;   
-    }
-    return tempQueue;
-}
-
 typedef struct threadPool {
     long nworkerThreads;
     pthread_t *tPool;
-
-    // Matrix pointers
     float **A;
-    float ***tiles;         // array of tiles of Mᵀ
+    float ***tiles;         
     float **resultMat;
-
     int rowsA;
     int colsA;
-
     int tileSize;
     int tileCount;
-
     pthread_mutex_t taskLock;
     pthread_cond_t taskCond;
     pthread_barrier_t barrier;
-
     int taskReady;
     int shutdown;
 } threadPool;
 
-void* worker(void* arg){
+void* worker(void* arg) {
     threadPool* pool = (threadPool*)arg;
+    long tid = (long)pthread_self() % pool->nworkerThreads;
+    int M = pool->rowsA;
+    int K = pool->colsA;
+    int tileSize = pool->tileSize;
+    int rowsPerThread = (M + pool->nworkerThreads - 1) / pool->nworkerThreads;
+    int rStart = tid * rowsPerThread;
+    int rEnd   = (rStart + rowsPerThread < M) ? (rStart + rowsPerThread) : M;
 
     while (1) {
-
         pthread_mutex_lock(&pool->taskLock);
-
         while (!pool->taskReady && !pool->shutdown)
             pthread_cond_wait(&pool->taskCond, &pool->taskLock);
-
         if (pool->shutdown) {
             pthread_mutex_unlock(&pool->taskLock);
-            pthread_exit(NULL);
+            return NULL;
         }
-
         pthread_mutex_unlock(&pool->taskLock);
-
-        // Tile phases
         for (int t = 0; t < pool->tileCount; t++) {
-
-            int start = t * pool->tileSize;
-            int end   = (start + pool->tileSize < pool->colsA)
-                        ? start + pool->tileSize
-                        : pool->colsA;
-
-            for (int r = 0; r < pool->rowsA; r++) {
-
-                float sum = 0;
-                for (int k = start; k < end; k++)
-                    sum += pool->A[r][k] * pool->tiles[t][r][k - start];
-
-                pool->resultMat[r][t] = sum;
+            float** tileRows = pool->tiles[t];   
+            int rowsInTile = (t == pool->tileCount - 1)
+                              ? (pool->rowsA % tileSize == 0 ? tileSize : pool->rowsA % tileSize)
+                              : tileSize;
+            int colOffset = t * tileSize;
+            for (int r = rStart; r < rEnd; r++) {
+                float* rowA = pool->A[r];
+                for (int i = 0; i < rowsInTile; i++) {
+                    float* rowBT = tileRows[i];
+                    float sum = 0;
+                    for (int k = 0; k < K; k++)
+                        sum += rowA[k] * rowBT[k];
+                    pool->resultMat[r][colOffset + i] = sum;
+                }
             }
-
-            pthread_barrier_wait(&pool->barrier);
+        pthread_barrier_wait(&pool->barrier);
         }
-
         pthread_mutex_lock(&pool->taskLock);
         pool->taskReady = 0;
         pthread_mutex_unlock(&pool->taskLock);
     }
 }
-
 
 void createThreadPool(threadPool* pool, int tileSize){
     pool->nworkerThreads = sysconf(_SC_NPROCESSORS_ONLN);
@@ -168,4 +107,3 @@ void createThreadPool(threadPool* pool, int tileSize){
     for(int i = 0; i < pool->nworkerThreads; i++)
         pthread_create(&pool->tPool[i], NULL, worker, pool);
 }
-

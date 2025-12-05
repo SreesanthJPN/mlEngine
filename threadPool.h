@@ -3,24 +3,6 @@
 
 #include <pthread.h>
 
-typedef struct funcArgs{
-    float* row1;
-    int rows;
-    float** mat2;
-    int cols;
-    int resultRow;
-}funcArgs;
-
-typedef struct taskQueue{
-    funcArgs* tQueue;
-    float** mat1;
-    int cols;
-    int mat1Rows;
-    float** mat2;
-    int mat2Rows;
-    int taskCount;
-}taskQueue;
-
 typedef struct threadPool {
     long nworkerThreads;
     pthread_t *tPool;
@@ -41,11 +23,6 @@ typedef struct threadPool {
     int taskReady;
     int shutdown;
 } threadPool;
-float* task(float* row1, int cols, float** mat2, int rows);
-
-funcArgs createArgs(float* r1, int r, float** m2, int c, int resultRow);
-
-taskQueue* createTaskQueue(float** mat1, int m1Rows, int cols, float** mat2, int m2Rows);
 
 void* worker(void* arg);
 
