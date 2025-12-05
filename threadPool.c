@@ -7,30 +7,6 @@
 #include<memory.h>
 #include <bits/pthreadtypes.h>
 
-float*** tileMatrix(float **MT, int rows, int cols, int tileSize, int *tileCountOut) {
-
-    int tileCount = (rows + tileSize - 1) / tileSize;
-    *tileCountOut = tileCount;
-
-    float ***tiles = malloc(tileCount * sizeof(float**));
-
-    for (int t = 0; t < tileCount; t++) {
-
-        int rowStart = t * tileSize;
-        int rowEnd = (rowStart + tileSize < rows) ? rowStart + tileSize : rows;
-
-        int height = rowEnd - rowStart;
-
-        // allocate array-of-rows for this tile
-        tiles[t] = malloc(height * sizeof(float*));
-
-        for (int i = 0; i < height; i++)
-            tiles[t][i] = MT[rowStart + i];   // row pointers
-    }
-
-    return tiles;
-}
-
 
 typedef struct threadPool {
     long nworkerThreads;
