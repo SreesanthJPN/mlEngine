@@ -46,7 +46,6 @@ tile* createTiles(int rows, int cols){
         Tile->tiledRows = tRows;
         Tile->tiledCols = tCols;
         Tile->nTiles = (rows / tRows) * (cols / tCols);
-        printf("\n%d %d %d %d\n", rows, tRows, cols, tCols);
         Tile->tD =  (tileData*)malloc((rows / tRows) * (cols / tCols) * sizeof(tileData));
         int c = 0;
         for(;i < rows - (tRows + (rows % tRows)); i = i+tRows){
@@ -60,7 +59,6 @@ tile* createTiles(int rows, int cols){
                 tempTileData.colEnd = j + tCols;
                 Tile->tD[c] = tempTileData;
                 c += 1;
-                    printf("%d\n", c);
             }
                 tileData tempTileData;
                 tempTileData.rowStart = i;
@@ -69,7 +67,6 @@ tile* createTiles(int rows, int cols){
                 tempTileData.colEnd = j + tCols + (cols % tCols);
                 Tile->tD[c] = tempTileData;
                 c++;
-                    printf("%d\n", c);
         }
         for(;i < rows; i = i + (tRows + (rows % tRows))){
             j=0;
@@ -82,7 +79,7 @@ tile* createTiles(int rows, int cols){
                 tempTileData.colEnd = j + tCols;
                 Tile->tD[c] = tempTileData;
                 c++;
-                    printf("%d\n", c);
+                
             }
                 tileData tempTileData;
                 tempTileData.rowStart = i;
@@ -91,7 +88,7 @@ tile* createTiles(int rows, int cols){
                 tempTileData.colEnd = j + tCols + (cols % tCols);
                 Tile->tD[c] = tempTileData;
                 c++;
-                    printf("%d\n", c);
+                   
     }
 }
     return Tile;
@@ -138,7 +135,7 @@ tile* tileByRows(int rows, int cols, int tCols){
                 tempTileData.colEnd = j + tCols;
                 Tile->tD[c] = tempTileData;
                 c += 1;
-                    printf("%d\n", c);
+                   
             }
                 tileData tempTileData;
                 tempTileData.rowStart = i;
@@ -147,7 +144,6 @@ tile* tileByRows(int rows, int cols, int tCols){
                 tempTileData.colEnd = j + tCols + (cols % tCols);
                 Tile->tD[c] = tempTileData;
                 c++;
-                    printf("%d\n", c);
         }
         for(;i < rows; i = i + (tRows + (rows % tRows))){
             j=0;
@@ -160,7 +156,7 @@ tile* tileByRows(int rows, int cols, int tCols){
                 tempTileData.colEnd = j + tCols;
                 Tile->tD[c] = tempTileData;
                 c++;
-                    printf("%d\n", c);
+                  
             }
                 tileData tempTileData;
                 tempTileData.rowStart = i;
@@ -169,7 +165,7 @@ tile* tileByRows(int rows, int cols, int tCols){
                 tempTileData.colEnd = j + tCols + (cols % tCols);
                 Tile->tD[c] = tempTileData;
                 c++;
-                    printf("%d\n", c);
+                    
     }
 }
 return Tile;
