@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "stdlib.h": "c",
+        "unistd.h": "c",
+        "time.h": "c",
+        "pthread.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "enabled",
+    "code-runner.executorMap": {
+    "c": "cd $workspaceRoot && gcc src/*.c -Iinclude -o app && ./app"
+},
+"cmake.ignoreCMakeListsMissing": true
+}
