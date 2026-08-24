@@ -2,20 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "type": "cppbuild",
+            "type": "shell",
             "label": "Build Multi-Folder Project",
-            "command": "/usr/bin/gcc",
-            "args": [
-                "-fdiagnostics-color=always",
-                "-g",
-                // 1. List all source files from different folders
-                "${workspaceFolder}/*.c",
-                "${workspaceFolder}/src/*.c", 
-                // 2. Add include folders with -I flag
-                "-I", "${workspaceFolder}/include",
-                // 3. Output executable name
-                "-o", "${workspaceFolder}/main"
-            ],
+            "command": "make",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

@@ -2,11 +2,9 @@
 #include<malloc.h>
 #include "findL3.h"
 
-#define TILE_SIZE_LIMIT (1ULL * 1024 * 1024)
-
 typedef struct tileData {
-    int rowStart, rowEnd;   // [rowStart, rowEnd)
-    int colStart, colEnd;   // [colStart, colEnd)
+    int rowStart, rowEnd;   
+    int colStart, colEnd;   
 } tileData;
 
 typedef struct tile {
@@ -35,15 +33,13 @@ tile* createTiles(int rows, int cols){
     Tile->__init_cols = cols;
 
     size_t bytes_per_row = (size_t)cols * sizeof(double);
-    size_t max_rows = getL3Cache()*0.3 / bytes_per_row;
+    size_t max_rows = getL3Cache()*0.25 / bytes_per_row;
 
     if (max_rows == 0) {
-        /* Even one row does not fit */
         free(Tile);
         return NULL;
     }
 
-    /* If entire matrix fits in one tile */
     if ((size_t)rows <= max_rows) {
         Tile->nTiles     = 1;
         Tile->tiledRows  = rows;
@@ -63,7 +59,6 @@ tile* createTiles(int rows, int cols){
         return Tile;
     }
 
-    /* Row tiling */
     int row_tile = (int)max_rows;
     int num_row_tiles = (rows + row_tile - 1) / row_tile;
 
@@ -94,10 +89,9 @@ tile* createTiles(int rows, int cols){
 tile* tileByRows(int rows, int cols, int tCols){
     size_t size = (size_t)rows*(size_t)cols*sizeof(double);
     tile *Tile = (tile*)malloc(sizeof(tile));
-    int tRows;
         Tile->__init_cols = cols;
         Tile->__init_rows = rows;
-    if(size <= getL3Cache()*0.3){
+    if(size <= getL3Cache()*0.25){
         Tile->nTiles = 1;
         Tile->tiledCols = cols;
         Tile->tiledRows = rows;
@@ -110,7 +104,7 @@ tile* tileByRows(int rows, int cols, int tCols){
     }
     else{
         int tRows = rows;
-        while(size > getL3Cache()*0.3){
+        while(size > getL3Cache()*0.25){
             tRows /= 2;
             size = (long int)tRows * (long int)tCols *sizeof(double);
         }

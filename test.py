@@ -1,6 +1,6 @@
 import numpy as np
 
-a = np.random.rand(100, 2000)
-b = np.random.rand(2000, 80000)
+a = np.random.rand(1000, 2000)
+b = np.random.rand(2000, 8000)
 
-c = a@b
+c = np.matmul(a,b)
